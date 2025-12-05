@@ -56,6 +56,36 @@ function decrypt (data, key) {
   return Buffer.concat([decipher.update(data), decipher.final()])
 }
 
+/* Encrypts a 32-byte buffer using AES-256-CBC with the given 32-byte key and IV */
+// Internal use only
+function encryptCBC(data, key, iv) {
+  if (!Buffer.isBuffer(data)) throw new TypeError('data must be a buffer')
+  if (data.length !== 32) throw new RangeError('data must be 32 bytes')
+  if (!Buffer.isBuffer(key)) throw new TypeError('key must be a buffer')
+  if (key.length !== 32) throw new RangeError('key must be 32 bytes')
+  if (!Buffer.isBuffer(iv)) throw new TypeError('iv must be a buffer')
+  if (iv.length !== 16) throw new RangeError('iv must be 16 bytes')
+    
+  const cipher = crypto.createCipheriv('AES-256-CBC', key, iv)
+  cipher.setAutoPadding(false)
+  return Buffer.concat([cipher.update(data), cipher.final()])
+}
+
+/* Decrypts a 32-byte buffer using AES-256-CBC with the given 32-byte key and IV */
+// Internal use only
+function decryptCBC(data, key, iv) {
+  if (!Buffer.isBuffer(data)) throw new TypeError('data must be a buffer')
+  if (data.length !== 32) throw new RangeError('data must be 32 bytes')
+  if (!Buffer.isBuffer(key)) throw new TypeError('key must be a buffer')
+  if (key.length !== 32) throw new RangeError('key must be 32 bytes')
+  if (!Buffer.isBuffer(iv)) throw new TypeError('iv must be a buffer')
+  if (iv.length !== 16) throw new RangeError('iv must be 16 bytes')
+
+  const decipher = crypto.createDecipheriv('AES-256-CBC', key, iv)
+  decipher.setAutoPadding(false)
+  return Buffer.concat([decipher.update(data), decipher.final()])
+}
+
 /* Derives a key using HKDF with the given parameters */
 // Internal use only
 async function hkdf (hash, key, salt, purpose, size) {
@@ -103,4 +133,4 @@ async function hkdf (hash, key, salt, purpose, size) {
 //   }
 // }
 
-module.exports = { encrypt, decrypt, hkdf, random, randomBytes, rng }
+module.exports = { encrypt, decrypt, encryptCBC, decryptCBC, hkdf, random }

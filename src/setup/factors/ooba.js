@@ -9,7 +9,7 @@
  */
 const defaults = require('../../defaults')
 const crypto = require('crypto')
-const { encrypt, hkdf, random, randomBytes } = require('../../crypt')
+const { encryptCBC, hkdf, random, randomBytes } = require('../../crypt')
 
 let subtle
 /* istanbul ignore next */
@@ -88,13 +88,19 @@ async function ooba (options) {
         code += (await random(36)).toString(36)
       }
       code = code.toUpperCase()
-      const params = JSON.parse(JSON.stringify(options.params))
-      params.code = code
 
       const prevKey = Buffer.from(
         await hkdf('sha256', Buffer.from(code), '', '', 32)
       )
-      const pad = encrypt(target, prevKey)
+      const iv = randomBytes(16)
+      const pad = encryptCBC(target, prevKey, iv)
+
+      const params = JSON.parse(JSON.stringify(options.params))
+      params.code = code
+      params.iv = iv.toString('base64')
+
+      const pubParams = JSON.parse(JSON.stringify(options.params))
+      pubParams.iv = iv.toString('base64')
 
       const plaintext = Buffer.from(JSON.stringify(params))
       const ciphertext = await subtle.encrypt(
@@ -106,7 +112,7 @@ async function ooba (options) {
       return {
         length: options.length,
         key: jwk,
-        params: options.params,
+        params: pubParams,
         next: Buffer.from(ciphertext).toString('hex'),
         pad: pad.toString('base64')
       }
