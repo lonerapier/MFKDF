@@ -8,7 +8,7 @@
  * @author Vivek Nair (https://nair.me) <vivek@nair.me>
  */
 const crypto = require('crypto')
-const { encrypt, decrypt, hkdf, random } = require('../../crypt')
+const { encryptCBC, decryptCBC, hkdf, random } = require('../../crypt')
 let subtle
 /* istanbul ignore next */
 if (typeof window !== 'undefined') {
@@ -59,7 +59,8 @@ function ooba (code) {
     const prevKey = Buffer.from(
       await hkdf('sha256', Buffer.from(code), '', '', 32)
     )
-    const target = decrypt(pad, prevKey)
+    const iv = Buffer.from(params.params.iv, 'base64')
+    const target = decryptCBC(pad, prevKey, iv)
 
     return {
       type: 'ooba',
@@ -70,12 +71,19 @@ function ooba (code) {
           code += (await random(0, 36)).toString(36)
         }
         code = code.toUpperCase()
-        const config = JSON.parse(JSON.stringify(params.params))
-        config.code = code
         const nextKey = Buffer.from(
           await hkdf('sha256', Buffer.from(code), '', '', 32)
         )
-        const pad = encrypt(target, nextKey)
+        const iv = crypto.randomBytes(16)
+        const pad = encryptCBC(target, nextKey, iv)
+
+        let pubParams = JSON.parse(JSON.stringify(params.params))
+        pubParams.iv = iv.toString('base64')
+
+        const config = JSON.parse(JSON.stringify(params.params))
+        config.code = code
+        config.iv = iv.toString('base64')
+
         const plaintext = Buffer.from(JSON.stringify(config))
         const publicKey = await subtle.importKey(
           'jwk',
@@ -97,7 +105,7 @@ function ooba (code) {
         return {
           length: params.length,
           key: params.key,
-          params: params.params,
+          params: pubParams,
           next: Buffer.from(ciphertext).toString('hex'),
           pad: pad.toString('base64')
         }
