@@ -52,6 +52,8 @@ async function strengthen (time = 0, memory = 0) {
     throw new TypeError('memory must be a non-negative integer')
   }
 
+  const internalKey = await this.deriveInternalKey()
+
   this.policy.time = time
   this.policy.memory = memory
 
@@ -67,6 +69,6 @@ async function strengthen (time = 0, memory = 0) {
     })
   )
 
-  this.policy.key = encrypt(this.key, kek).toString('base64')
+  this.policy.key = encrypt(internalKey, kek).toString('base64')
 }
 module.exports.strengthen = strengthen

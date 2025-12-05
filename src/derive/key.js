@@ -126,11 +126,12 @@ async function key (policy, factors, verify = true, stack = false) {
       })
     )
   }
-  const key = decrypt(Buffer.from(policy.key, 'base64'), kek)
+
+  const internalKey = decrypt(Buffer.from(policy.key, 'base64'), kek)
 
   const integrityKey = await hkdf(
     'sha256',
-    key,
+    internalKey,
     Buffer.from(policy.salt, 'base64'),
     'mfkdf2:integrity',
     32
@@ -186,7 +187,7 @@ async function key (policy, factors, verify = true, stack = false) {
       const paramsKey = Buffer.from(
         await hkdf(
           'sha256',
-          key,
+          internalKey,
           Buffer.from(factor.salt, 'base64'),
           'mfkdf2:factor:params:' + factor.id,
           32
@@ -208,6 +209,13 @@ async function key (policy, factors, verify = true, stack = false) {
     policy.threshold,
     policy.factors.length
   )
+
+  let key = internalKey
+  if (!stack) {
+    key = Buffer.from(
+      await hkdf('sha256', internalKey, Buffer.from(policy.salt, 'base64'), 'mfkdf2:key:final', 32)
+    )
+  }
 
   return new MFKDFDerivedKey(newPolicy, key, secret, originalShares, outputs)
 }

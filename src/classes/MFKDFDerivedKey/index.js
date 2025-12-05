@@ -8,6 +8,9 @@
  * @author Vivek Nair (https://nair.me) <vivek@nair.me>
  */
 
+const { decrypt } = require('../../crypt')
+const { argon2id } = require('hash-wasm')
+
 /**
  * Class representing a multi-factor derived key
  * @author Vivek Nair (https://nair.me) <vivek@nair.me>
@@ -29,6 +32,28 @@ class MFKDFDerivedKey {
     this.secret = secret
     this.shares = shares
     this.outputs = outputs
+  }
+
+  /**
+   * Derive the internal key-encryption key (KEK) for this derived key.
+   * @private
+   * @returns {Promise<Buffer>}
+   * @async
+   */
+  async deriveInternalKey () {
+    const kek = Buffer.from(
+      await argon2id({
+        password: this.secret,
+        salt: Buffer.from(this.policy.salt, 'base64'),
+        hashLength: 32,
+        parallelism: 1,
+        iterations: 2 + Math.max(0, parseInt(this.policy.time) || 0),
+        memorySize: 19456 + Math.max(0, parseInt(this.policy.memory) || 0),
+        outputType: 'binary'
+      })
+    )
+
+    return decrypt(Buffer.from(this.policy.key, 'base64'), kek)
   }
 }
 

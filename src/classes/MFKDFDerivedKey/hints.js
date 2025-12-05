@@ -48,6 +48,8 @@ async function getHint (factor, bits = 7) {
     throw new TypeError('bits must be a number between 1 and 256')
   }
 
+  let internalKey = await this.deriveInternalKey()
+
   // get factor data
   const factorData = this.policy.factors.find((f) => f.id === factor)
   if (!factorData) {
@@ -57,7 +59,7 @@ async function getHint (factor, bits = 7) {
   const secretKey = Buffer.from(
     await hkdf(
       'sha256',
-      this.key,
+      internalKey,
       Buffer.from(factorData.salt, 'base64'),
       'mfkdf2:factor:secret:' + factorData.id,
       32
@@ -121,11 +123,12 @@ module.exports.getHint = getHint
  * @async
  */
 async function addHint (factor, bits = 7) {
-  
+  const internalKey = await this.deriveInternalKey()
+
   if (this.policy.hmac) {
     const integrityKey = await hkdf(
       'sha256',
-      this.key,
+      internalKey,
       Buffer.from(this.policy.salt, 'base64'),
       'mfkdf2:integrity',
       32
