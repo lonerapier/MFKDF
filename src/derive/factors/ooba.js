@@ -8,7 +8,7 @@
  * @author Vivek Nair (https://nair.me) <vivek@nair.me>
  */
 const crypto = require('crypto')
-const { encryptCBC, decryptCBC, hkdf, random } = require('../../crypt')
+const { encryptCBC, decryptCBC, hkdf, random, randomBytes } = require('../../crypt')
 let subtle
 /* istanbul ignore next */
 if (typeof window !== 'undefined') {

@@ -29,6 +29,7 @@ const { hkdf } = require('../../crypt')
  * @memberOf MFKDFDerivedKey
  */
 async function getSubkey (purpose = '', salt = '') {
-  return Buffer.from(await hkdf('sha256', this.key, salt, purpose, 32))
+  const internalKey = await this.deriveInternalKey()
+  return Buffer.from(await hkdf('sha256', internalKey, salt, purpose, 32))
 }
 module.exports.getSubkey = getSubkey

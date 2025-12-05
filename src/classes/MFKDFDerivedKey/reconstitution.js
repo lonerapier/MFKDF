@@ -312,6 +312,8 @@ async function reconstitute (
   }
   if (threshold <= 0) throw new RangeError('threshold must be positive')
 
+  const internalKey = await this.deriveInternalKey()
+
   const factors = {}
   const material = {}
   const outputs = {}
@@ -324,7 +326,7 @@ async function reconstitute (
     const secretKey = Buffer.from(
       await hkdf(
         'sha256',
-        this.key,
+        internalKey,
         Buffer.from(factor.salt, 'base64'),
         'mfkdf2:factor:secret:' + factor.id,
         32
@@ -386,7 +388,7 @@ async function reconstitute (
     const paramsKey = Buffer.from(
       await hkdf(
         'sha256',
-        this.key,
+        internalKey,
         salt,
         'mfkdf2:factor:params:' + factor.id,
         32
@@ -439,7 +441,7 @@ async function reconstitute (
     const secretKey = Buffer.from(
       await hkdf(
         'sha256',
-        this.key,
+        internalKey,
         Buffer.from(factor.salt, 'base64'),
         'mfkdf2:factor:secret:' + factor.id,
         32
@@ -458,7 +460,7 @@ async function reconstitute (
   if (this.policy.hmac) {
     const integrityKey = await hkdf(
       'sha256',
-      this.key,
+      internalKey,
       Buffer.from(this.policy.salt, 'base64'),
       'mfkdf2:integrity',
       32

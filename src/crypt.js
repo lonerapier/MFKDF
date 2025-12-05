@@ -133,4 +133,4 @@ async function hkdf (hash, key, salt, purpose, size) {
 //   }
 // }
 
-module.exports = { encrypt, decrypt, encryptCBC, decryptCBC, hkdf, random }
+module.exports = { encrypt, decrypt, encryptCBC, decryptCBC, hkdf, random, randomBytes, rng }

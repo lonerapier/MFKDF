@@ -153,7 +153,7 @@ async function key (factors, options) {
 
   // generate secret key material
   const secret = randomBytes(32)
-  const key = randomBytes(32)
+  const internalKey = randomBytes(32)
   let kek
   if (options.stack) {
     kek = Buffer.from(
@@ -178,7 +178,7 @@ async function key (factors, options) {
       })
     )
   }
-  policy.key = encrypt(key, kek).toString('base64')
+  policy.key = encrypt(internalKey, kek).toString('base64')
   const shares = share(secret, policy.threshold, factors.length, rng)
 
   // process factors
@@ -207,13 +207,13 @@ async function key (factors, options) {
 
     const pad = encrypt(share, stretched)
     const paramsKey = Buffer.from(
-      await hkdf('sha256', key, salt, 'mfkdf2:factor:params:' + factor.id, 32)
+      await hkdf('sha256', internalKey, salt, 'mfkdf2:factor:params:' + factor.id, 32)
     )
     const params = await factor.params({ key: paramsKey })
     outputs[factor.id] = await factor.output()
 
     const secretKey = Buffer.from(
-      await hkdf('sha256', key, salt, 'mfkdf2:factor:secret:' + factor.id, 32)
+      await hkdf('sha256', internalKey, salt, 'mfkdf2:factor:secret:' + factor.id, 32)
     )
 
     policy.factors.push({
@@ -230,7 +230,7 @@ async function key (factors, options) {
     const integrityData = await extract(policy)
     const integrityKey = await hkdf(
       'sha256',
-      key,
+      internalKey,
       Buffer.from(policy.salt, 'base64'),
       'mfkdf2:integrity',
       32
@@ -238,6 +238,13 @@ async function key (factors, options) {
     const hmac = crypto.createHmac('sha256', integrityKey)
     hmac.update(integrityData)
     policy.hmac = hmac.digest('base64')
+  }
+
+  let key = internalKey
+  if (!options.stack) {
+    key = Buffer.from(
+      await hkdf('sha256', internalKey, Buffer.from(policy.salt, 'base64'), 'mfkdf2:key:final', 32)
+    )
   }
 
   const result = new MFKDFDerivedKey(policy, key, secret, shares, outputs)
