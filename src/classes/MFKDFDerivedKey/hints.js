@@ -9,6 +9,8 @@
  */
 
 const { decrypt, hkdf } = require('../../crypt')
+const { extract } = require('../../integrity')
+const crypto = require('crypto')
 
 /**
  * Get a (probabilistic) hint for a factor to (usually) help verify which factor is wrong.
@@ -119,8 +121,34 @@ module.exports.getHint = getHint
  * @async
  */
 async function addHint (factor, bits = 7) {
+  
+  if (this.policy.hmac) {
+    const integrityKey = await hkdf(
+      'sha256',
+      this.key,
+      Buffer.from(this.policy.salt, 'base64'),
+      'mfkdf2:integrity',
+      32
+    )
+    const integrityData = await extract(this.policy)
+    const hmac = crypto
+    .createHmac('sha256', integrityKey)
+    .update(integrityData)
+    .digest('base64')
+    if (this.policy.hmac !== hmac) {
+      throw new RangeError('key policy integrity check failed')
+    }
+  }
+
   const hint = await this.getHint(factor, bits)
   const factorData = this.policy.factors.find((f) => f.id === factor)
   factorData.hint = hint
+
+  if (this.policy.hmac) {
+    const newPolicyData = await extract(this.policy)
+    const newHmac = crypto.createHmac('sha256', integrityKey)
+    newHmac.update(newPolicyData)
+    this.policy.hmac = newHmac.digest('base64')
+  }
 }
 module.exports.addHint = addHint

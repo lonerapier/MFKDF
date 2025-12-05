@@ -50,7 +50,8 @@ async function extractFactorCore (factor) {
   hash.update(factor.pad)
   hash.update(factor.salt)
   hash.update(factor.secret)
-
+  hash.update(factor.hint || '')
+  
   return hash.digest()
 }
 
