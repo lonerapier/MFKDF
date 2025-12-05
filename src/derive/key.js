@@ -56,7 +56,7 @@ async function key (policy, factors, verify = true, stack = false) {
   }
 
   const shares = []
-  const newFactors = []
+  const newFactors = {}
   const outputs = {}
 
   for (const factor of policy.factors) {
@@ -85,36 +85,14 @@ async function key (policy, factors, verify = true, stack = false) {
         )
 
         share = decrypt(pad, stretched)
-
-        if (factor.hint) {
-          const buffer = Buffer.from(
-            await hkdf(
-              'sha256',
-              stretched,
-              Buffer.from(factor.salt, 'base64'),
-              'mfkdf2:factor:hint:' + factor.id,
-              32
-            )
-          )
-
-          const binaryString = [...buffer]
-            .map((byte) => byte.toString(2).padStart(8, '0'))
-            .reduce((acc, bits) => acc + bits, '')
-
-          const hint = binaryString.slice(-1 * factor.hint.length)
-
-          if (hint !== factor.hint) {
-            throw new RangeError('hint does not match for factor ' + factor.id)
-          }
-        }
       }
 
       shares.push(share)
       if (material.output) outputs[factor.id] = await material.output()
-      newFactors.push(material.params)
+      newFactors[factor.id] = material
     } else {
       shares.push(null)
-      newFactors.push(null)
+      newFactors[factor.id] = null
     }
   }
 
@@ -150,23 +128,6 @@ async function key (policy, factors, verify = true, stack = false) {
   }
   const key = decrypt(Buffer.from(policy.key, 'base64'), kek)
 
-  const newPolicy = JSON.parse(JSON.stringify(policy))
-
-  for (const [index, factor] of newFactors.entries()) {
-    if (typeof factor === 'function') {
-      const paramsKey = Buffer.from(
-        await hkdf(
-          'sha256',
-          key,
-          Buffer.from(newPolicy.factors[index].salt, 'base64'),
-          'mfkdf2:factor:params:' + newPolicy.factors[index].id,
-          32
-        )
-      )
-      newPolicy.factors[index].params = await factor({ key: paramsKey })
-    }
-  }
-
   const integrityKey = await hkdf(
     'sha256',
     key,
@@ -184,6 +145,57 @@ async function key (policy, factors, verify = true, stack = false) {
       throw new RangeError('key policy integrity check failed')
     }
   }
+  
+  const newPolicy = JSON.parse(JSON.stringify(policy))
+
+  for (const factor of newPolicy.factors) {
+    const material = newFactors[factor.id]
+
+    if (material) {
+      if (factor.hint) {
+        const stretched = Buffer.from(
+          await hkdf(
+            'sha256',
+            material.data,
+            Buffer.from(factor.salt, 'base64'),
+            'mfkdf2:factor:pad:' + factor.id,
+            32
+          )
+        )
+        const buffer = Buffer.from(
+          await hkdf(
+            'sha256',
+            stretched,
+            Buffer.from(factor.salt, 'base64'),
+            'mfkdf2:factor:hint:' + factor.id,
+            32
+          )
+        )
+
+        const binaryString = [...buffer]
+          .map((byte) => byte.toString(2).padStart(8, '0'))
+          .reduce((acc, bits) => acc + bits, '')
+
+        const hint = binaryString.slice(-1 * factor.hint.length)
+
+        if (hint !== factor.hint) {
+          throw new RangeError('hint does not match for factor ' + factor.id)
+        }
+      }
+
+      const paramsKey = Buffer.from(
+        await hkdf(
+          'sha256',
+          key,
+          Buffer.from(factor.salt, 'base64'),
+          'mfkdf2:factor:params:' + factor.id,
+          32
+        )
+      )
+      factor.params = await material.params({ key: paramsKey })
+    }
+  }
+
   if (policy.hmac) {
     const newPolicyData = await extract(newPolicy)
     const newHmac = crypto.createHmac('sha256', integrityKey)
